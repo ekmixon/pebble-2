@@ -68,14 +68,14 @@ def make_client(email=None):
         net.account = client.new_account(messages.NewRegistration.from_data(email=email,
             terms_of_service_agreed=True))
     else:
-        raise Exception("Unrecognized terms of service URL %s" % tos)
+        raise Exception(f"Unrecognized terms of service URL {tos}")
     return client
 
 def get_chall(authz, typ):
     for chall_body in authz.body.challenges:
         if isinstance(chall_body.chall, typ):
             return chall_body
-    raise Exception("No %s challenge found" % typ)
+    raise Exception(f"No {typ} challenge found")
 
 class ValidationError(Exception):
     """An error that occurs during challenge validation."""
@@ -85,7 +85,7 @@ class ValidationError(Exception):
         self.detail = detail
 
     def __str__(self):
-        return "%s: %s: %s" % (self.domain, self.problem_type, self.detail)
+        return f"{self.domain}: {self.problem_type}: {self.detail}"
 
 def make_csr(domains):
     key = OpenSSL.crypto.PKey()
@@ -116,7 +116,7 @@ def auth_and_issue(domains, chall_type="http-01", email=None, cert_output=None, 
     elif chall_type == "dns-01":
         cleanup = do_dns_challenges(client, authzs)
     else:
-        raise Exception("invalid challenge type %s" % chall_type)
+        raise Exception(f"invalid challenge type {chall_type}")
 
     try:
         order = client.poll_and_finalize(order)
@@ -132,22 +132,21 @@ def do_dns_challenges(client, authzs):
         name, value = (c.validation_domain_name(a.body.identifier.value),
             c.validation(client.net.key))
         cleanup_hosts.append(name)
-        requests.post(SET_TXT, json={
-            "host": name + ".",
-            "value": value
-        }).raise_for_status()
+        requests.post(
+            SET_TXT, json={"host": f"{name}.", "value": value}
+        ).raise_for_status()
+
         client.answer_challenge(c, c.response(client.net.key))
     def cleanup():
         for host in cleanup_hosts:
-            requests.post(CLEAR_TXT, json={
-                "host": host + "."
-            }).raise_for_status()
+            requests.post(CLEAR_TXT, json={"host": f"{host}."}).raise_for_status()
+
     return cleanup
 
 def do_http_challenges(client, authzs):
     port = int(PORT)
     challs = [get_chall(a, challenges.HTTP01) for a in authzs]
-    answers = set([http_01_answer(client, c) for c in challs])
+    answers = {http_01_answer(client, c) for c in challs}
     server = standalone.HTTP01Server(("", port), answers)
     thread = threading.Thread(target=server.serve_forever)
     thread.start()
@@ -195,7 +194,7 @@ def expect_problem(problem_type, func):
         else:
             raise
     if not ok:
-        raise Exception('Expected %s, got no error' % problem_type)
+        raise Exception(f'Expected {problem_type}, got no error')
 
 if __name__ == "__main__":
     # Die on SIGINT
